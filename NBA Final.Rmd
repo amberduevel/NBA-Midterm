@@ -1,0 +1,139 @@
+---
+title: "Analysis of MN Timberwolves Shot Data"
+author: "Amber Duevel"
+date: "2/28/2022"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r library, include=FALSE}
+Sys.setenv("VROOM_CONNECTION_SIZE"=131072 * 2)
+library(nbastatR)
+library(shiny)
+library(tibble)
+library(tidyverse)
+library(ggplot2)
+library(grid)
+library(jpeg)
+library(RCurl)
+library(gganimate)
+library(tidyverse)
+library(gapminder)
+library(gifski)
+library(lubridate)
+library(maps)
+library(mapdata)
+library(transformr)
+library(ggthemes)
+library(dplyr)
+library(patchwork)
+library(png)
+library(directlabels)
+```
+
+```{r shot graph, warning=FALSE}
+#graphic from the internet for the plot
+court<-rasterGrob(readJPEG("Use_nba_court.jpg"),width=unit(1,"npc"), height=unit(1,"npc")) #creating court and sizing correctly
+
+logo <- rasterGrob(readJPEG("logo.jpg"),width=unit(1.7, "npc"), height=unit(1.5, "npc")) #creating and sizing the logo of the team for reference on the plot
+
+#gathering multiple seasons of shot data from the Timberwolves so I'm able to compare each season with the next
+shotData2013 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2013)
+shotData2014 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2014)
+shotData2015 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2015)
+shotData2016 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2016)
+shotData2017 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2017)
+shotData2018 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2018)
+shotData2019 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2019)
+shotData2020 <- teams_shots(teams="Minnesota Timberwolves", seasons = 2020)
+
+#combining all the seasons together into one data set so I'm able to display all of them at the same time
+animation_shotData <- bind_rows(shotData2013, shotData2014, shotData2015, shotData2016, shotData2017, shotData2018, shotData2019, shotData2020) 
+
+#plotting the shots for multiple seasons
+Type_of_shot <- ggplot(animation_shotData, aes(x=locationX, y=locationY)) + 
+      #adding and scaling the court onto the plot so the shots are accurately displayed
+      annotation_custom(court, xmin=-250, xmax=250, ymin= -50, ymax=420) +
+      #setting the points to made/missed shots 
+      #setting it to a lighter color so there's a noticeable difference between points
+      geom_point(aes(color = typeEvent), alpha=0.25) +
+      #x and y limits for the graph
+      xlim(-250, 250) +
+      ylim(-50, 420) +
+      coord_fixed() +
+      #making the title bold so it'll stand out
+      theme(plot.title = element_text(hjust = 0.5,face="bold"))+
+      #labeling the axis and the variable
+      #the length of the court is displayed in a 1/10th of a foot
+      labs(x="Horizontal Length (1/10th ft)", y="Vertical Length (1/10th)", color= "Missed or Made Shot")+
+      #setting the missed/made shots to the Timberwolves team colors
+      scale_color_manual(values=c('#1E6194','#79C019'))+
+      #adding the Timberwolves' logo
+      annotation_custom(logo, xmin=180, xmax=250, ymin= 380, ymax=430)
+      
+
+#adding animation to represent each season
+ animation_plot <- Type_of_shot + 
+    #each frame represents a new season
+    transition_states(yearSeason)+
+    #cleaning up the display of the plot
+    enter_fade()+
+    exit_shrink()+
+    view_follow()+
+    #labeling the year of the season
+    transition_time(yearSeason)+
+    #adding the season year, team name and type of plot to the title
+    ggtitle("Shot Chart\n Season: {frame_time}", label= unique(animation_shotData$nameTeam))
+
+animation_plot
+ 
+#setting the time spent on each frame for each season
+animate(animation_plot, nframes= 8, duration = 10) 
+
+```
+Findings:  
+-Three points shots are missed more compared to two point shots.  
+-Layups are made more than they are missed.  
+-In the 2020 season, there are less shots inside the three point line compared to previous seasons.  
+-Very few half court or far away shots are taken but almost all are missed shots.
+-A lot of shots are taken as layups or near the hoop.  
+
+Explanation:  
+  When looking at the graph there is more green displayed at the three point line compared to blue. This means more shots are missed than made at this line. There is also very few shots that are taken far from the three point line (close to half court). Almost all of these points are green for each season. We can view these points as buzzer beater shots that are shot at the last seconds of the game. Most of these shots are missed which can inform us that these are difficult shots to make. The team has a very low probability of making this type of shot. Each season has a new spot where more shots are taken. In 2020 season, we can see that there are less shots taken inside the three point line compared to other seasons. In every season there is a lot of blue at the net or near it. This means that a lot of layups are made each season. This can inform us that making layups can be seen as an easier shot to make. Or this is the Timberwolves strongest type of shot. Other information we can gather from this is rebounds made. If a player misses a shot, another player can rebound it and make the shot. This could be a strength for the Timberwolves and that's why there is more blue points near the net. I also found it interesting how throughout every season the graph shows more green points than blue. This means that the team has more missed shots overall. Knowing this information we can infer that the Timberwolves might not be a strong shooting team. 
+
+```{r win graph, echo=FALSE, warning=FALSE}
+#gathering the probability of winning data in a specific game
+win <- win_probability(game_ids = c(21700002), filter_non_plays = T, nest_data = FALSE, return_message = TRUE)
+
+#graphing the data points for each team
+plot<-ggplot(win, aes(x=minuteGame, y=pctWinProbHome))+
+      #graphing the probability of the home team winning the game
+      geom_line(aes(y=pctWinProbHome, color=nameTeamHome), alpha=.8)+
+      #graphing the probability of the away team winning the game
+      geom_line(aes(y=pctWinProbAway,color=nameTeamAway), alpha=.8)+
+      #labeling the x and y axis
+      labs(x="Amount of Minutes into Game", y="Probability of Winning", color="Team")+
+      #labeling the title
+      ggtitle("Probabilty of Winning Vs Minutes into Game")+
+      #matching the team colors to the plot of the line
+      scale_color_manual(values = c('#006BB8','#D31145'))
+
+#adding animation to the plot
+animation_plot <- plot + transition_reveal(minuteGame)+
+  #keeping the y axis constant and only moving the x axis
+  view_follow(fixed_y=TRUE)
+
+animation_plot
+
+```
+  
+For this graph I used a new data set which was the probability of winning the game. I compared two teams, Golden State Warriors and Houston Rockets. As the game went on the graph shows the probability of each team winning. The graph fluctuates throughout the game and there isn't a set increase or decrease for either team. At some points during the game the lines move towards fifty percent which could mean the game is close. Once there is only a couple minutes left in the game the lines move toward 80 percent and 20 percent. Due to the lines not ending at 100 and 0 percent it means the score difference wasn't a huge gap.
+
+
+
